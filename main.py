@@ -1,4 +1,4 @@
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 from yt_dlp import YoutubeDL
@@ -86,26 +86,29 @@ def download_audio(video_id: str):
         "format": "bestaudio/best",
         "quiet": True,
         "outtmpl": output_template,
-        "postprocessors": [{
-            "key": "FFmpegExtractAudio",
-            "preferredcodec": "mp3",
-            "preferredquality": "192",
-        }],
+        "postprocessors": [
+            {
+                "key": "FFmpegExtractAudio",
+                "preferredcodec": "mp3",
+                "preferredquality": "192",
+            }
+        ],
     }
 
-    with YoutubeDL(ydl_opts) as ydl:
-        info = ydl.extract_info(f"https://www.youtube.com/watch?v={video_id}", download=True)
+    try:
+        with YoutubeDL(ydl_opts) as ydl:
+            info = ydl.extract_info(f"https://www.youtube.com/watch?v={video_id}", download=True)
+            filename = ydl.prepare_filename(info)
+            mp3_filename = os.path.splitext(filename)[0] + ".mp3"
 
-        # Get the filename from postprocessing
-        if "requested_downloads" in info and info["requested_downloads"]:
-            downloaded_file = info["requested_downloads"][0]["filepath"]
-        else:
-            # Fallback
-            downloaded_file = ydl.prepare_filename(info)
-            downloaded_file = os.path.splitext(downloaded_file)[0] + ".mp3"
+            if not os.path.exists(mp3_filename):
+                raise HTTPException(status_code=500, detail="MP3 file not found after download")
+
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error downloading audio: {str(e)}")
 
     return FileResponse(
-        downloaded_file,
+        mp3_filename,
         media_type="audio/mpeg",
-        filename=os.path.basename(downloaded_file)
+        filename=os.path.basename(mp3_filename)
     )
