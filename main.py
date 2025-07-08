@@ -47,6 +47,16 @@ def get_audio(video_id: str):
 
     with YoutubeDL(ydl_opts) as ydl:
         info = ydl.extract_info(f"https://www.youtube.com/watch?v={video_id}", download=False)
+        # Choose the first audio format URL explicitly
+        audio_url = None
+        for f in info["formats"]:
+            if f.get("acodec") != "none":
+                audio_url = f["url"]
+                break
+
+        if not audio_url:
+            raise Exception("No audio format found.")
+
         related = []
         if "related" in info:
             for rel in info["related"]:
@@ -61,14 +71,14 @@ def get_audio(video_id: str):
 
         return {
             "title": info["title"],
-            "audio_url": info["url"],
+            "audio_url": audio_url,
             "thumbnail": info.get("thumbnail"),
             "related": related,
         }
 
+
 @app.get("/download")
 def download_audio(video_id: str):
-    # Define output path
     output_dir = "/tmp"
     output_template = os.path.join(output_dir, "%(title)s.%(ext)s")
 
@@ -85,12 +95,17 @@ def download_audio(video_id: str):
 
     with YoutubeDL(ydl_opts) as ydl:
         info = ydl.extract_info(f"https://www.youtube.com/watch?v={video_id}", download=True)
-        filename = ydl.prepare_filename(info)
-        mp3_filename = os.path.splitext(filename)[0] + ".mp3"
 
-    # Return file response
+        # Get the filename from postprocessing
+        if "requested_downloads" in info and info["requested_downloads"]:
+            downloaded_file = info["requested_downloads"][0]["filepath"]
+        else:
+            # Fallback
+            downloaded_file = ydl.prepare_filename(info)
+            downloaded_file = os.path.splitext(downloaded_file)[0] + ".mp3"
+
     return FileResponse(
-        mp3_filename,
+        downloaded_file,
         media_type="audio/mpeg",
-        filename=os.path.basename(mp3_filename)
+        filename=os.path.basename(downloaded_file)
     )
