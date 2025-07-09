@@ -41,39 +41,30 @@ def search(query: str):
 @app.get("/audio")
 def get_audio(video_id: str):
     ydl_opts = {
-        "format": "bestaudio/best",
         "quiet": True,
+        "format": "bestaudio[ext=m4a]/bestaudio/best",
     }
 
     with YoutubeDL(ydl_opts) as ydl:
-        info = ydl.extract_info(f"https://www.youtube.com/watch?v={video_id}", download=False)
-        # Choose the first audio format URL explicitly
-        audio_url = None
-        for f in info["formats"]:
-            if f.get("acodec") != "none":
-                audio_url = f["url"]
-                break
+        info = ydl.extract_info(
+            f"https://www.youtube.com/watch?v={video_id}",
+            download=False
+        )
+        # Try to get the URL robustly
+        audio_url = info.get("url")
+        if not audio_url:
+            for f in info.get("formats", []):
+                if f.get("acodec") != "none":
+                    audio_url = f["url"]
+                    break
 
         if not audio_url:
-            raise Exception("No audio format found.")
-
-        related = []
-        if "related" in info:
-            for rel in info["related"]:
-                related.append({
-                    "id": rel["id"],
-                    "title": rel["title"],
-                    "url": f"https://www.youtube.com/watch?v={rel['id']}",
-                    "thumbnail": rel.get("thumbnail"),
-                    "duration": rel.get("duration"),
-                    "uploader": rel.get("uploader"),
-                })
+            raise HTTPException(status_code=500, detail="No audio URL found.")
 
         return {
             "title": info["title"],
             "audio_url": audio_url,
             "thumbnail": info.get("thumbnail"),
-            "related": related,
         }
 
 
