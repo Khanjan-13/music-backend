@@ -43,6 +43,7 @@ def get_audio(video_id: str):
     ydl_opts = {
         "format": "bestaudio/best",
         "quiet": True,
+        "cookiefile": "cookies.txt",  # <== this line enables cookies
     }
 
     try:
@@ -54,7 +55,6 @@ def get_audio(video_id: str):
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"YoutubeDL error: {str(e)}")
 
-    # Select first audio format URL
     audio_url = None
     for f in info["formats"]:
         if f.get("acodec") != "none":
@@ -69,6 +69,7 @@ def get_audio(video_id: str):
         "audio_url": audio_url,
         "thumbnail": info.get("thumbnail"),
     }
+
 @app.get("/download")
 def download_audio(video_id: str):
     output_dir = "/tmp"
