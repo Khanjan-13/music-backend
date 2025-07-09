@@ -75,41 +75,42 @@ def get_audio(video_id: str):
 
 @app.get("/download")
 def download_audio(video_id: str):
-    """
-    Downloads an mp3 file and returns it as response.
-    """
-    # Create a secure temp directory
+    import tempfile
+
+    # Put your exported cookies file path here
+    cookies_file = "cookies.txt"
+
     tmp_dir = tempfile.mkdtemp()
     output_template = os.path.join(tmp_dir, "%(title)s.%(ext)s")
 
     ydl_opts = {
         "format": "bestaudio/best",
         "quiet": True,
+        "cookiefile": cookies_file,    # <--- THIS FIXES YOUR PROBLEM
         "outtmpl": output_template,
-        "postprocessors": [{
-            "key": "FFmpegExtractAudio",
-            "preferredcodec": "mp3",
-            "preferredquality": "192",
-        }],
+        "postprocessors": [
+            {
+                "key": "FFmpegExtractAudio",
+                "preferredcodec": "mp3",
+                "preferredquality": "192",
+            }
+        ],
     }
 
     try:
         with YoutubeDL(ydl_opts) as ydl:
             info = ydl.extract_info(f"https://www.youtube.com/watch?v={video_id}", download=True)
-            # The MP3 filename after postprocessing
-            downloaded_filename = ydl.prepare_filename(info)
-            mp3_filename = os.path.splitext(downloaded_filename)[0] + ".mp3"
+            filename = ydl.prepare_filename(info)
+            mp3_filename = os.path.splitext(filename)[0] + ".mp3"
 
-            # Sanity check
-            if not os.path.isfile(mp3_filename):
-                raise HTTPException(status_code=500, detail="MP3 file not created.")
+            if not os.path.exists(mp3_filename):
+                raise HTTPException(status_code=500, detail="MP3 file not found after download")
 
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error downloading audio: {str(e)}")
 
-    # Return the file as a download
     return FileResponse(
         mp3_filename,
         media_type="audio/mpeg",
-        filename=os.path.basename(mp3_filename),
+        filename=os.path.basename(mp3_filename)
     )
