@@ -3,6 +3,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 from yt_dlp import YoutubeDL
 import os
+import tempfile
 
 app = FastAPI()
 
